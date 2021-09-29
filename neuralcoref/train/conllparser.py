@@ -23,6 +23,7 @@ from neuralcoref.train.document import (
     extract_mentions_spans,
 )
 from neuralcoref.train.utils import parallel_process
+from conlluparser import load_file
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 REMOVED_CHAR = ["/", "%", "*"]
@@ -37,6 +38,7 @@ NORMALIZE_DICT = {
     "-RSB-": "]",
 }
 
+# Note emma: De här måste antagligen ändras för våra kategorier
 CONLL_GENRES = {"bc": 0, "bn": 1, "mz": 2, "nw": 3, "pt": 4, "tc": 5, "wb": 6}
 
 FEATURES_NAMES = [
@@ -134,7 +136,7 @@ def check_numpy_array(feature, array, n_mentions_list, compressed=True):
 
 ###############################################################################################
 ### PARALLEL FCT (has to be at top-level of the module to be pickled for multiprocessing) #####
-def load_file(full_name, debug=False):
+def load_file_old(full_name, debug=False):
     """
     load a *._conll file
     Input: full_name: path to the file
@@ -659,13 +661,13 @@ class ConllCorpus(object):
                 file_list = [
                     os.path.join(dirpath, f)
                     for f in filenames
-                    if f.endswith(".v4_auto_conll") or f.endswith(".v4_gold_conll")
+                    if f.endswith(".conllu") or f.endswith(".gold_conllu")
                 ]
                 cleaned_file_list = []
                 for f in file_list:
                     fn = f.split(".")
-                    if fn[1] == "v4_auto_conll":
-                        gold = fn[0] + "." + "v4_gold_conll"
+                    if fn[1] == "conllu":
+                        gold = fn[0] + "." + "gold_conllu"
                         if gold not in file_list:
                             cleaned_file_list.append(f)
                     else:
@@ -694,13 +696,13 @@ class ConllCorpus(object):
             file_list = [
                 os.path.join(dirpath, f)
                 for f in filenames
-                if f.endswith(".v4_auto_conll") or f.endswith(".v4_gold_conll")
+                if f.endswith(".conllu") or f.endswith(".conllu")
             ]
             cleaned_file_list = []
             for f in file_list:
                 fn = f.split(".")
-                if fn[1] == "v4_auto_conll":
-                    gold = fn[0] + "." + "v4_gold_conll"
+                if fn[1] == "conllu":
+                    gold = fn[0] + "." + "gold_conllu"
                     if gold not in file_list:
                         cleaned_file_list.append(f)
                 else:

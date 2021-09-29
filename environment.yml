@@ -1,0 +1,10 @@
+name: project_data_science
+dependencies:
+  - python=3.7.*
+  - spacy=2.*
+  - cython>=0.25
+  - pytest
+
+
+
+
