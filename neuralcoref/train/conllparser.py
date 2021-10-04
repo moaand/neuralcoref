@@ -23,7 +23,7 @@ from neuralcoref.train.document import (
     extract_mentions_spans,
 )
 from neuralcoref.train.utils import parallel_process
-from conlluparser import load_file
+from neuralcoref.train.conlluparser import load_file
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 REMOVED_CHAR = ["/", "%", "*"]
@@ -40,6 +40,8 @@ NORMALIZE_DICT = {
 
 # Note emma: De här måste antagligen ändras för våra kategorier
 CONLL_GENRES = {"bc": 0, "bn": 1, "mz": 2, "nw": 3, "pt": 4, "tc": 5, "wb": 6}
+CONLLU_GENRES = {"academic": 0, "bio": 1, "conversation": 2, "fiction": 3, 
+    "interview": 4, "news": 5, "speech": 6, "textbook": 7, "vlog": 8, "voyage": 9, "whow": 10}
 
 FEATURES_NAMES = [
     "mentions_features",  # 0
@@ -337,6 +339,7 @@ class ConllDoc(Document):
                 i, s_tok = next(s_iter, (None, None))
                 if debug and len(c_tok):
                     print("eating token: conll", c_tok, "spacy", s_tok, "index", i)
+            # TODO (the project group 1): might need to change this to work with our files
             assert len(c_lookup), "Unmatched conll and spacy tokens"
             lookup.append(c_lookup)
         return lookup
@@ -737,6 +740,10 @@ class ConllCorpus(object):
         print("utts_doc_idx size", len(self.utts_doc_idx))
         print("🌋 Building docs")
         for name, part in self.docs_names:
+            # from name, get genre
+            pattern = r"GUM_([a-zA-Z]+)*"
+            match = re.search(pattern, name)
+            print("hej", match[1])
             self.docs.append(
                 ConllDoc(
                     name=name,
@@ -745,7 +752,7 @@ class ConllCorpus(object):
                     blacklist=self.blacklist,
                     consider_speakers=True,
                     embedding_extractor=self.embed_extractor,
-                    conll=CONLL_GENRES[name[:2]],
+                    conll=CONLLU_GENRES[match[1]],
                 )
             )
         print("🌋 Loading spacy model")
