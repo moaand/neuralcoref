@@ -6,7 +6,7 @@ import argparse
 import socket
 from datetime import datetime
 import numpy as np
-
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -133,7 +133,7 @@ def run_model(args):
     # Load datasets and embeddings
     embed_path = args.weights if args.weights is not None else args.train
     tensor_embeddings, voc = load_embeddings_from_file(embed_path + "tuned_word")
-    dataset = NCDataset(args.train, args)
+    
     eval_dataset = NCDataset(args.eval, args)
     print("Vocabulary:", len(voc))
 
@@ -149,8 +149,10 @@ def run_model(args):
         SIZE_SINGLE_IN,
     )
     model.load_embeddings(tensor_embeddings)
+
     if args.cuda:
         model.cuda()
+
     if args.weights is not None:
         print("🏝 Loading pre-trained weights")
         model.load_weights(args.weights)
@@ -165,12 +167,11 @@ def run_model(args):
         )
 
     print("🏝 Loading conll evaluator")
+
     eval_evaluator = ConllEvaluator(
         model, eval_dataset, args.eval, args.evalkey, embed_path, args
     )
-    train_evaluator = ConllEvaluator(
-        model, dataset, args.train, args.trainkey, embed_path, args
-    )
+
     print("🏝 Testing evaluator and getting first eval score")
     eval_evaluator.test_model()
     start_time = time.time()
@@ -179,6 +180,21 @@ def run_model(args):
     elapsed = time.time() - start_time
     print(f"|| s/evaluation {elapsed:5.2f}")
     writer.add_scalar("eval/" + "F1_conll", f1_conll, 0)
+
+    if args.weights is not None:
+        print("Stop model stoooop")
+        return
+
+    dataset = NCDataset(args.train, args)
+    train_evaluator = ConllEvaluator(
+        model, dataset, args.train, args.trainkey, embed_path, args
+    )
+
+    # Test on test set
+    test_dataset = NCDataset(args.test, args)
+    test_evaluator = ConllEvaluator(
+        model, test_dataset, args.test, args.testkey, embed_path, args
+    )
 
     # Preparing dataloader
     print("🏝 Preparing dataloader")
@@ -213,8 +229,11 @@ def run_model(args):
     ):
         best_model_path = args.save_path + "best_model" + save_name
         start_time_all = time.time()
-        best_f1_conll = 0
+        best_f1_conll = -float("inf") # used to be 0
         lower_eval = 0
+        train_scores = []
+        eval_scores = []
+        test_scores = []
         for epoch in range(start_epoch, end_epoch):
             """ Run an epoch """
             print(f"🚘 {save_name} Epoch {epoch:d}")
@@ -294,18 +313,24 @@ def run_model(args):
                 f"|| min/epoch {ep:5.2f} | est. remaining time (h) {ea:5.2f} | loss {epoch_loss:.2e}"
             )
             writer.add_scalar("epoch/" + "loss", epoch_loss, g_step)
-            if epoch % args.conll_train_interval == 0:
+            if epoch % args.conll_train_interval == 0: # maybe change this to calculate score less often
                 start_time = time.time()
                 train_evaluator.build_test_file()
                 score, f1_conll, ident = train_evaluator.get_score()
+                train_scores.append(f1_conll)
                 elapsed = time.time() - start_time
                 ep = elapsed_epoch / 60
                 print(f"|| min/train evaluation {ep:5.2f} | F1_conll {f1_conll:5.2f}")
                 writer.add_scalar("epoch/" + "F1_conll", f1_conll, g_step)
+            if epoch % args.conll_test_interval == 0:
+                test_evaluator.build_test_file()
+                score, f1_conll, ident = test_evaluator.get_score()
+                test_scores.append(f1_conll)
             if epoch % args.conll_eval_interval == 0:
                 start_time = time.time()
                 eval_evaluator.build_test_file()
                 score, f1_conll, ident = eval_evaluator.get_score()
+                eval_scores.append(f1_conll)
                 elapsed = time.time() - start_time
                 ep = elapsed_epoch / 60
                 print(f"|| min/evaluation {ep:5.2f}")
@@ -343,6 +368,47 @@ def run_model(args):
         save_path = args.save_path + save_name + "_" + str(epoch)
         torch.save(model.state_dict(), save_path)
         load_model(model, best_model_path)
+
+        print('final score eval:', score, f1_conll, ident)
+        train_evaluator.build_test_file()
+        score, f1_conll, ident = train_evaluator.get_score()
+        print('final score train:', score, f1_conll, ident)
+        print(args.test)
+        test_dataset = NCDataset(args.test, args)        
+        test_evaluator = ConllEvaluator(
+           model, test_dataset, args.test, args.testkey, embed_path, args
+        )
+        test_evaluator.test_model()
+        test_evaluator.build_test_file()
+        score, f1_conll, ident = test_evaluator.get_score()
+        print('final score test:', score, f1_conll, ident)
+
+        results_path = f"results/experiment{args.experiment_number}/{save_name}"
+
+        if not os.path.exists(results_path):
+            os.makedirs(results_path)
+        else:
+            if os.listdir(results_path):
+                print("There are already data in", results_path)
+                print("Erasing")
+                for file in os.listdir(results_path):
+                    os.remove(f"{results_path}/{file}")
+
+
+        np.save(f"{results_path}/train", np.array(train_scores))
+        np.save(f"{results_path}/eval", np.array(eval_scores))
+        np.save(f"{results_path}/test", np.array(test_scores))
+
+        print("**********************\n",np.linspace(start_epoch+1, end_epoch, len(train_scores)),'\t', train_scores,'\n******************')
+        
+        plt.plot(np.linspace(start_epoch+1, end_epoch, len(train_scores)),train_scores, label='Train')
+        plt.plot(np.linspace(start_epoch+1, end_epoch, len(eval_scores)),eval_scores, label='Eval')
+        plt.plot(np.linspace(start_epoch+1, end_epoch, len(test_scores)),test_scores, label='Test')
+        plt.xlabel("Number of epochs")
+        plt.ylabel("Average F1 score")
+        plt.legend()
+        plt.savefig(f'{results_path}/fig')
+        plt.cla()
         return g_step
 
     if args.startstage is None or args.startstage == "allpairs":
@@ -409,6 +475,17 @@ if __name__ == "__main__":
         help="Path to the train dataset",
     )
     parser.add_argument(
+        "--test",
+        type=str,
+        default=DIR_PATH + "/data/",
+        help="Path to the test dataset",
+    )
+
+    parser.add_argument(
+            "--testkey", type=str, help="Path to an optional key file for scoring"
+    )
+
+    parser.add_argument(
         "--eval", type=str, default=DIR_PATH + "/data/", help="Path to the eval dataset"
     )
     parser.add_argument(
@@ -443,19 +520,25 @@ if __name__ == "__main__":
         help="Start from a previously saved checkpoint file",
     )
     parser.add_argument(
-        "--log_interval", type=int, default=10, help="test every X mini-batches"
+        "--log_interval", type=int, default=20, help="test every X mini-batches"
     )
     parser.add_argument(
         "--conll_eval_interval",
         type=int,
-        default=10,
+        default=200,
         help="evaluate eval F1 conll every X epochs",
     )
     parser.add_argument(
         "--conll_train_interval",
         type=int,
-        default=20,
+        default=200,
         help="evaluate train F1 conll every X epochs",
+    )
+    parser.add_argument(
+        "--conll_test_interval",
+        type=int,
+        default=200,
+        help="evaluate test F1 conll every X epochs",
     )
     parser.add_argument("--seed", type=int, default=1111, help="random seed")
     parser.add_argument("--costfn", type=float, default=0.8, help="cost of false new")
@@ -541,6 +624,12 @@ if __name__ == "__main__":
         choices=(0, 1),
         help="Use lazy loading (1, default) or not (0) while loading the npy files",
     )
+    parser.add_argument(
+        "--experiment_number",
+        type=int,
+        default=0,
+        help="Enter the number which the current experiment have",
+    )
     args = parser.parse_args()
     args.costs = {"FN": args.costfn, "FL": args.costfl, "WL": args.costwl}
     args.lazy = bool(args.lazy)
@@ -556,10 +645,11 @@ if __name__ == "__main__":
     args.cuda = torch.cuda.is_available()
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
-
+        
     args.evalkey = args.evalkey if args.evalkey is not None else args.eval + "/key.txt"
     args.trainkey = args.train + "/key.txt"
+    args.testkey = args.testkey if args.testkey is not None else args.test + "/key.txt"
     args.train = args.train + "/numpy/"
     args.eval = args.eval + "/numpy/"
-    print(args)
+    args.test = args.test + "/numpy/"
     run_model(args)

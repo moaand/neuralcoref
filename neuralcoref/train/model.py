@@ -66,11 +66,16 @@ class Model(nn.Module):
         top_single_linear = (
             layer for layer in self.single_top if isinstance(layer, nn.Linear)
         )
+        cuda_available = torch.cuda.is_available()
         for w, b, layer in zip(
-            single_layers_weights, single_layers_biases, top_single_linear
+           single_layers_weights, single_layers_biases, top_single_linear
         ):
-            layer.weight = nn.Parameter(torch.from_numpy(w).float())
-            layer.bias = nn.Parameter(torch.from_numpy(b).float().squeeze())
+            if cuda_available:
+                layer.weight = nn.Parameter(torch.from_numpy(w).float().cuda())
+                layer.bias = nn.Parameter(torch.from_numpy(b).float().squeeze().cuda())
+            else:
+                layer.weight = nn.Parameter(torch.from_numpy(w).float())
+                layer.bias = nn.Parameter(torch.from_numpy(b).float().squeeze())
         pair_layers_weights, pair_layers_biases = [], []
         for f in sorted(os.listdir(weights_path)):
             if f.startswith("pair_mentions_weights"):
@@ -83,8 +88,13 @@ class Model(nn.Module):
         for w, b, layer in zip(
             pair_layers_weights, pair_layers_biases, top_pair_linear
         ):
-            layer.weight = nn.Parameter(torch.from_numpy(w).float())
-            layer.bias = nn.Parameter(torch.from_numpy(b).float().squeeze())
+            if cuda_available:
+                layer.weight = nn.Parameter(torch.from_numpy(w).float().cuda())
+                layer.bias = nn.Parameter(torch.from_numpy(b).float().squeeze().cuda())
+            else:
+                layer.weight = nn.Parameter(torch.from_numpy(w).float())
+                layer.bias = nn.Parameter(torch.from_numpy(b).float().squeeze())
+            
 
     def forward(self, inputs, concat_axis=1):
         pairs = len(inputs) == 8

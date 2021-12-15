@@ -11,16 +11,16 @@ BATCH_SIZE_PATH = os.path.join(
     PACKAGE_DIRECTORY, "test_batch_size.txt"
 )  # fernandes.txt")#
 
+SIZE_GENRE = 11  # Size of the genre one-hot array
 SIZE_SPAN = 250  # size of the span vector (averaged word embeddings)
 SIZE_WORD = 8  # number of words in a mention (tuned embeddings)
 SIZE_EMBEDDING = 50  # size of the words embeddings
-SIZE_FP = 70  # number of features for a pair of mention
+SIZE_FP = 63+SIZE_GENRE  # number of features for a pair of mention
 SIZE_FP_COMPRESSED = (
     9
 )  # size of the features for a pair of mentions as stored in numpy arrays
-SIZE_FS = 24  # number of features of a single mention
+SIZE_FS = 17 + SIZE_GENRE  # number of features of a single mention
 SIZE_FS_COMPRESSED = 6  # size of the features for a mention as stored in numpy arrays
-SIZE_GENRE = 7  # Size of the genre one-hot array
 SIZE_MENTION_EMBEDDING = (
     SIZE_SPAN + SIZE_WORD * SIZE_EMBEDDING
 )  # A mention embeddings (span + words vectors)

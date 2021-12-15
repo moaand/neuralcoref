@@ -23,7 +23,6 @@ from neuralcoref.train.document import (
     extract_mentions_spans,
 )
 from neuralcoref.train.utils import parallel_process
-from neuralcoref.train.conlluparser import load_file
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 REMOVED_CHAR = ["/", "%", "*"]
@@ -38,10 +37,12 @@ NORMALIZE_DICT = {
     "-RSB-": "]",
 }
 
-# Note emma: De här måste antagligen ändras för våra kategorier
 CONLL_GENRES = {"bc": 0, "bn": 1, "mz": 2, "nw": 3, "pt": 4, "tc": 5, "wb": 6}
 CONLLU_GENRES = {"academic": 0, "bio": 1, "conversation": 2, "fiction": 3, 
     "interview": 4, "news": 5, "speech": 6, "textbook": 7, "vlog": 8, "voyage": 9, "whow": 10}
+# The genres which contain the most data from the original GUM dataset
+#7_CONLLU_GENRES = {"academic": 0, "bio": 1, "fiction": 2, "interview": 3, "news": 4, "voyage": 5, "whow": 6}
+#CONLLU_GENRES = 7_CONLLU_GENRES
 
 FEATURES_NAMES = [
     "mentions_features",  # 0
@@ -331,7 +332,7 @@ class ConllDoc(Document):
         s_iter = enumerate(t for t in spacy_tokens)
         i, s_tok = next(s_iter)
         for c_tok in c_iter:
-            # if debug: print("conll", c_tok, "spacy", s_tok, "index", i)
+            #if debug: print("conll", c_tok, "spacy", s_tok, "index", i)
             c_lookup = []
             while i is not None and len(c_tok) and c_tok.startswith(s_tok.text):
                 c_lookup.append(i)
@@ -347,6 +348,7 @@ class ConllDoc(Document):
     def add_conll_utterance(
         self, parsed, tokens, corefs, speaker_id, use_gold_mentions, debug=False
     ):
+        
         conll_lookup = self.get_conll_spacy_lookup(tokens, parsed)
         self.conll_tokens.append(tokens)
         self.conll_lookup.append(conll_lookup)
@@ -357,7 +359,6 @@ class ConllDoc(Document):
             if missing_values:
                 found_values = {key: coref[key] for key in ['label', 'start', 'end'] if coref.get(key, None) is not None}
                 raise Exception(f"Coref {self.name} with fields {found_values} has empty values for the keys {missing_values}.")
-
             coref["start"] = conll_lookup[coref["start"]][0]
             coref["end"] = conll_lookup[coref["end"]][-1]
 
@@ -664,13 +665,13 @@ class ConllCorpus(object):
                 file_list = [
                     os.path.join(dirpath, f)
                     for f in filenames
-                    if f.endswith(".conllu") or f.endswith(".gold_conllu")
+                    if f.endswith(".conll") or f.endswith(".gold_conll")
                 ]
                 cleaned_file_list = []
                 for f in file_list:
                     fn = f.split(".")
-                    if fn[1] == "conllu":
-                        gold = fn[0] + "." + "gold_conllu"
+                    if fn[1] == "conll":
+                        gold = fn[0] + "." + "gold_conll"
                         if gold not in file_list:
                             cleaned_file_list.append(f)
                     else:
@@ -680,7 +681,7 @@ class ConllCorpus(object):
                 for doc in doc_list:
                     kf.write(doc)
 
-    def list_undetected_mentions(self, data_path, save_file, debug=True):
+    def list_undetected_mentions(self, data_path, save_file, debug=False):
         self.read_corpus(data_path)
         print("🌋 Listing undetected mentions")
         with io.open(save_file, "w", encoding="utf-8") as out_file:
@@ -740,10 +741,9 @@ class ConllCorpus(object):
         print("utts_doc_idx size", len(self.utts_doc_idx))
         print("🌋 Building docs")
         for name, part in self.docs_names:
-            # from name, get genre
+            #from name, get genre
             pattern = r"GUM_([a-zA-Z]+)*"
             match = re.search(pattern, name)
-            print("hej", match[1])
             self.docs.append(
                 ConllDoc(
                     name=name,
@@ -779,6 +779,7 @@ class ConllCorpus(object):
             + (str(bool(self.gold_mentions)))
         )
         doc_iter = (s for s in self.utts_text)
+        
         for utt_tuple in tqdm(
             zip(
                 nlp.pipe(doc_iter),
@@ -899,6 +900,7 @@ class ConllCorpus(object):
 
 
 if __name__ == "__main__":
+    # Our train folder
     DIR_PATH = os.path.dirname(os.path.realpath(__file__))
     parser = argparse.ArgumentParser(
         description="Training the neural coreference model"
@@ -910,7 +912,7 @@ if __name__ == "__main__":
         help='Function ("all", "key", "parse", "find_undetected")',
     )
     parser.add_argument(
-        "--path", type=str, default=DIR_PATH + "/data/", help="Path to the dataset"
+        "--path", type=str, default=DIR_PATH + "/data/train", help="Path to the dataset"
     )
     parser.add_argument(
         "--key", type=str, help="Path to an optional key file for scoring"

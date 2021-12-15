@@ -144,8 +144,8 @@ class NCDataset(Dataset):
                 P is the number of antecedent per mention (number of pairs for the mention)
                 S = 250 is the size of the span vector (averaged word embeddings)
                 W = 8 is the number of words in a mention (tuned embeddings)
-                Fp = 70 is the number of features for a pair of mention
-                Fs = 24 is the number of features of a single mention
+                Fp = 63+SIZE_GENRE is the number of features for a pair of mention
+                Fs = 17+SIZE_GENRE is the number of features of a single mention
 
             if there are some pairs:
                 inputs = (spans, words, features, ant_spans, ant_words, ana_spans, ana_words, pairs_features)

@@ -6,7 +6,11 @@ from six import string_types, integer_types
 from spacy.tokens import Span, Token
 
 from neuralcoref.train.compat import unicode_
-from neuralcoref.train.utils import encode_distance, parallel_process
+from neuralcoref.train.utils import (
+    encode_distance, 
+    parallel_process,
+    SIZE_GENRE
+)
 
 try:
     from itertools import izip_longest as zip_longest
@@ -491,7 +495,6 @@ class Speaker(object):
                 return True
         return False
 
-
 class EmbeddingExtractor:
     """
     Compute words embedding features for mentions
@@ -682,7 +685,7 @@ class Document(object):
 
     def set_genre(self, conll):
         if conll is not None:
-            genre = np.zeros((7,))
+            genre = np.zeros((SIZE_GENRE,))
             genre[conll] = 1
         else:
             genre = np.array(0, ndmin=1, copy=False)

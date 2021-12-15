@@ -45,7 +45,7 @@ build/
 develop-eggs/
 dist/
 eggs/
-lib/
+# lib/    Commenting this out since it will exclude the CorScorer module which is necessary-
 lib64/
 parts/
 sdist/

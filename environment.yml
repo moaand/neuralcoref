@@ -1,10 +1,11 @@
-name: project_data_science
+name: project_neural_coref
 dependencies:
   - python=3.7.*
   - spacy=2.*
   - cython>=0.25
   - pytest
-
+  - boto3
+  - matplotlib
 
 
 
