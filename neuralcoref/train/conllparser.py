@@ -23,6 +23,7 @@ from neuralcoref.train.document import (
     extract_mentions_spans,
 )
 from neuralcoref.train.utils import parallel_process
+#from neuralcoref.train.conllparser import load_file as load_file_new
 
 PACKAGE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 REMOVED_CHAR = ["/", "%", "*"]
@@ -40,9 +41,8 @@ NORMALIZE_DICT = {
 CONLL_GENRES = {"bc": 0, "bn": 1, "mz": 2, "nw": 3, "pt": 4, "tc": 5, "wb": 6}
 CONLLU_GENRES = {"academic": 0, "bio": 1, "conversation": 2, "fiction": 3, 
     "interview": 4, "news": 5, "speech": 6, "textbook": 7, "vlog": 8, "voyage": 9, "whow": 10}
-# The genres which contain the most data from the original GUM dataset
-#7_CONLLU_GENRES = {"academic": 0, "bio": 1, "fiction": 2, "interview": 3, "news": 4, "voyage": 5, "whow": 6}
-#CONLLU_GENRES = 7_CONLLU_GENRES
+#TEMP_GENRES = {"academic": 0, "bio": 1, "fiction": 2, "interview": 3, "news": 4, "voyage": 5, "whow": 6}
+#CONLLU_GENRES = TEMP_GENRES
 
 FEATURES_NAMES = [
     "mentions_features",  # 0
@@ -573,11 +573,13 @@ class ConllDoc(Document):
 class ConllCorpus(object):
     def __init__(
         self,
+        use_new=True,
         n_jobs=4,
         embed_path=PACKAGE_DIRECTORY + "/weights/",
         gold_mentions=False,
         blacklist=False,
     ):
+        self.use_new = use_new
         self.n_jobs = n_jobs
         self.features = {}
         self.utts_text = []
@@ -697,21 +699,26 @@ class ConllCorpus(object):
         print("🌋 Reading files")
         for dirpath, _, filenames in os.walk(data_path):
             print("In", dirpath, os.path.abspath(dirpath))
+            
             file_list = [
                 os.path.join(dirpath, f)
                 for f in filenames
-                if f.endswith(".conllu") or f.endswith(".conllu")
+                if f.endswith(".conll") or f.endswith(".gold_conll")
             ]
+            # cleaned_file_list borde innehålla alla filer vi bryr oss om
             cleaned_file_list = []
             for f in file_list:
                 fn = f.split(".")
-                if fn[1] == "conllu":
-                    gold = fn[0] + "." + "gold_conllu"
+                if fn[1] == "conll":
+                    gold = fn[0] + "." + "gold_conll"
                     if gold not in file_list:
                         cleaned_file_list.append(f)
                 else:
                     cleaned_file_list.append(f)
-            doc_list = parallel_process(cleaned_file_list, load_file)
+            if self.use_new:
+                doc_list = parallel_process(cleaned_file_list, load_file_new)
+            else:
+                doc_list = parallel_process(cleaned_file_list, load_file_old)
             for docs in doc_list:  # executor.map(self.load_file, cleaned_file_list):
                 for (
                     utts_text,
@@ -934,10 +941,12 @@ if __name__ == "__main__":
     if args.key is None:
         args.key = args.path + "/key.txt"
     CORPUS = ConllCorpus(
-        n_jobs=args.n_jobs, gold_mentions=args.gold_mentions, blacklist=args.blacklist
+        use_new=False, n_jobs=args.n_jobs, gold_mentions=args.gold_mentions, blacklist=args.blacklist
     )
     if args.function == "parse" or args.function == "all":
+        print(args.path)
         SAVE_DIR = args.path + "/numpy/"
+        print(SAVE_DIR)
         if not os.path.exists(SAVE_DIR):
             os.makedirs(SAVE_DIR)
         else:

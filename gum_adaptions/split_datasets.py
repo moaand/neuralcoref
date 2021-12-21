@@ -22,7 +22,7 @@ def data_partition(args):
     sub_dirs = os.listdir(args.data_path)
     
     for sub_dir in sub_dirs:
-        files = os.listdir(f"{args.data_path}/{sub_dir}")
+        files = [elem for elem in os.listdir(f"{args.data_path}/{sub_dir}") if elem[0] != "."]
         temp = files
         train, temp = train_test_split(temp, train_size=0.7, test_size=0.3, random_state=13)
         dev, test = train_test_split(temp, train_size=0.5, test_size=0.5, random_state=13)
@@ -54,13 +54,13 @@ def main():
     parser.add_argument(
         "--data_path",
         type=str,
-        default=DIR_PATH + "../GUM_CONLLU_DATA/",
+        default="../GUM_CONLLU_DATA/",
         help="Path to the GUM data",
     )
     parser.add_argument(
         "--save_path",
         type=str,
-        default=DIR_PATH + "../neuralcoref/train/data/",
+        default="../neuralcoref/train/data",
         help="Path to where the parsed data should be put",
     )
     args = parser.parse_args()
